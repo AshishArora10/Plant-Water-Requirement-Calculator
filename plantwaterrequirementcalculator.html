@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plant Water Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f7f0;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+      font-size: 1.6rem;
+      margin-bottom: 5px;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: #777;
+      margin-bottom: 25px;
+      font-size: 0.9rem;
+    }
+
+    .box {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 520px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .box h2 {
+      color: #2e7d32;
+      font-size: 1rem;
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+
+    select, input[type="number"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: #fafafa;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 18px;
+      width: 100%;
+      padding: 10px;
+      background: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    button:hover { background: #1b5e20; }
+
+    #results { display: none; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .stat {
+      background: #e8f5e9;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat .num {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: #2e7d32;
+    }
+
+    .stat .lbl {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: #e8f5e9;
+      padding: 8px;
+      text-align: left;
+      color: #2e7d32;
+    }
+
+    td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .water-day { color: #1565c0; font-weight: 500; }
+    .rest-day  { color: #aaa; }
+
+    .tip {
+      background: #fff8e1;
+      border-left: 4px solid #ffc107;
+      padding: 10px 12px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 12px;
+    }
+
+    .plant-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .plant-item {
+      background: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.82rem;
+    }
+
+    .plant-item strong { color: #2e7d32; }
+    .plant-item span   { color: #888; font-size: 0.76rem; }
+  </style>
+</head>
+<body>
+<!-- 
+  water per session = base_ml × pot_factor × season_factor
+  weekly total      = per_session × frequency × num_plants
+ -->
+  <h1>🌿 Plant Water Calculator</h1>
+  <p class="subtitle">Find out how much water your plant needs</p>
+
+  <!-- Input Form -->
+  <div class="box">
+    <h2>📋 Enter Plant Details</h2>
+
+    <label>Plant Type</label>
+    <select id="plantType"></select>
+
+    <label>Pot Size</label>
+    <select id="potSize">
+      <option value="small">Small (under 6 inch)</option>
+      <option value="medium" selected>Medium (6–10 inch)</option>
+      <option value="large">Large (10–14 inch)</option>
+      <option value="xlarge">X-Large (above 14 inch)</option>
+    </select>
+
+    <label>Season</label>
+    <select id="season">
+      <option value="spring">Spring</option>
+      <option value="summer">Summer</option>
+      <option value="autumn">Autumn</option>
+      <option value="winter">Winter</option>
+    </select>
+
+    <label>Number of Plants</label>
+    <input type="number" id="numPlants" value="1" min="1" max="50"/>
+
+    <button onclick="calculate()">💧 Calculate</button>
+  </div>
+
+  <!-- Results -->
+  <div class="box" id="results">
+    <h2>📊 Watering Summary</h2>
+    <div class="stats" id="statBoxes"></div>
+    <table>
+      <thead>
+        <tr><th>Day</th><th>Amount</th><th>Action</th></tr>
+      </thead>
+      <tbody id="scheduleBody"></tbody>
+    </table>
+    <div class="tip" id="tipBox"></div>
+  </div>
+
+  <!-- Plant Database -->
+  <div class="box">
+    <h2>🌱 Plant Database</h2>
+    <div class="plant-list" id="plantList"></div>
+  </div>
+
+<script>
+  // Plant database
+  var plants = [
+    { id:"rose",        name:"Rose",        ml:300, freq:3, type:"flowering" },
+    { id:"tomato",      name:"Tomato",       ml:400, freq:4, type:"vegetable" },
+    { id:"basil",       name:"Basil",        ml:200, freq:3, type:"herb"      },
+    { id:"cactus",      name:"Cactus",       ml: 50, freq:1, type:"succulent" },
+    { id:"aloe",        name:"Aloe Vera",    ml: 80, freq:1, type:"succulent" },
+    { id:"monstera",    name:"Monstera",     ml:250, freq:2, type:"tropical"  },
+    { id:"peace_lily",  name:"Peace Lily",   ml:220, freq:2, type:"indoor"    },
+    { id:"snake_plant", name:"Snake Plant",  ml: 90, freq:1, type:"indoor"    },
+    { id:"mint",        name:"Mint",         ml:250, freq:4, type:"herb"      },
+    { id:"sunflower",   name:"Sunflower",    ml:350, freq:3, type:"flowering" },
+    { id:"cucumber",    name:"Cucumber",     ml:450, freq:5, type:"vegetable" },
+    { id:"pothos",      name:"Pothos",       ml:180, freq:2, type:"indoor"    },
+  ];
+
+  // Multipliers based on pot size and season
+  var potFactor    = { small:0.6, medium:1.0, large:1.5, xlarge:2.2 };
+  var seasonFactor = { spring:1.1, summer:1.4, autumn:0.8, winter:0.5 };
+
+  // Care tips per plant type
+  var tips = {
+    succulent: "Let soil dry completely between waterings. Less is more!",
+    tropical:  "Loves humidity — mist leaves between waterings.",
+    herb:      "Keep soil moist but ensure good drainage.",
+    indoor:    "Water only when the top inch of soil feels dry.",
+    flowering: "Water more during blooming, reduce after flowers fade.",
+    vegetable: "Water at the base, not the leaves, to prevent disease.",
+  };
+
+  var weekDays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+  // Setup page on load
+  window.onload = function() {
+    // Populate plant dropdown
+    var sel = document.getElementById("plantType");
+    for (var i = 0; i < plants.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = plants[i].id;
+      opt.textContent = plants[i].name;
+      sel.appendChild(opt);
+    }
+
+    // Populate plant database list
+    var list = document.getElementById("plantList");
+    for (var j = 0; j < plants.length; j++) {
+      var p = plants[j];
+      var div = document.createElement("div");
+      div.className = "plant-item";
+      div.innerHTML = "<strong>" + p.name + "</strong><br>" +
+        "<span>" + p.ml + " ml · " + p.freq + "x/week · " + p.type + "</span>";
+      list.appendChild(div);
+    }
+
+    // Auto-detect current season from month
+    var month = new Date().getMonth();
+    var seasonMap = ["winter","winter","spring","spring","spring",
+                     "summer","summer","summer","autumn","autumn","autumn","winter"];
+    document.getElementById("season").value = seasonMap[month];
+  };
+
+  // Calculate watering needs
+  function calculate() {
+    var plantId = document.getElementById("plantType").value;
+    var pot     = document.getElementById("potSize").value;
+    var season  = document.getElementById("season").value;
+    var num     = parseInt(document.getElementById("numPlants").value) || 1;
+
+    if (!plantId) {
+      alert("Please select a plant!");
+      return;
+    }
+
+    // Find selected plant
+    var plant;
+    for (var i = 0; i < plants.length; i++) {
+      if (plants[i].id === plantId) { plant = plants[i]; break; }
+    }
+
+    // Formula: base ml × pot factor × season factor
+    var perWatering = Math.round(plant.ml * potFactor[pot] * seasonFactor[season]);
+    var weeklyTotal = perWatering * plant.freq * num;
+    var dailyAvg    = Math.round(weeklyTotal / 7);
+
+    // Show stat boxes
+    document.getElementById("statBoxes").innerHTML =
+      makeStatBox(perWatering + " ml", "Per Watering") +
+      makeStatBox(plant.freq + "x",    "Times / Week") +
+      makeStatBox(weeklyTotal + " ml", "Weekly Total") +
+      makeStatBox(dailyAvg + " ml",    "Daily Average");
+
+    // Build 7-day schedule (spread watering days evenly)
+    var step = Math.floor(7 / plant.freq);
+    var waterDays = {};
+    for (var d = 0; d < plant.freq; d++) {
+      waterDays[(d * step) % 7] = true;
+    }
+
+    var tbody = document.getElementById("scheduleBody");
+    tbody.innerHTML = "";
+    for (var w = 0; w < 7; w++) {
+      var isWater = waterDays[w] === true;
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + weekDays[w] + "</td>" +
+        "<td class='" + (isWater ? "water-day" : "rest-day") + "'>" +
+          (isWater ? (perWatering * num) + " ml" : "—") + "</td>" +
+        "<td class='" + (isWater ? "water-day" : "rest-day") + "'>" +
+          (isWater ? "💧 Water" : "✅ Rest") + "</td>";
+      tbody.appendChild(tr);
+    }
+
+    // Show tip
+    document.getElementById("tipBox").textContent =
+      "💡 " + (tips[plant.type] || "Water when topsoil feels dry.");
+
+    // Show results section
+    var res = document.getElementById("results");
+    res.style.display = "block";
+    res.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function makeStatBox(value, label) {
+    return '<div class="stat">' +
+           '<div class="num">' + value + '</div>' +
+           '<div class="lbl">' + label + '</div>' +
+           '</div>';
+  }
+</script>
+
+</body>
+</html>
